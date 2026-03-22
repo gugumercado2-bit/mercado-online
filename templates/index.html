@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mercado Online Avançado</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        
+        body {
+            background: #1e1e2f;
+            color: #fff;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            padding: 20px;
+        }
+        
+        h1,
+        h2,
+        h3 {
+            text-align: center;
+            color: #ff6f00;
+            margin-bottom: 15px;
+        }
+        
+        input,
+        button,
+        select {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border: none;
+            font-size: 1em;
+        }
+        
+        button {
+            cursor: pointer;
+            background: #ff6f00;
+            color: #fff;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        
+        button:hover {
+            background: #ffa500;
+        }
+        
+        .login-box,
+        .admin-box,
+        .caixa-box,
+        .dashboard-box {
+            background: #2c2c3f;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px auto;
+        }
+        
+        .flex {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .flex>* {
+            flex: 1 1 100%;
+        }
+        
+        .carrinho-box,
+        .produtos-box,
+        .fiado-box,
+        .vendas-box {
+            background: #3a3a50;
+            padding: 15px;
+            border-radius: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th,
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #555;
+            text-align: left;
+        }
+        
+        .total {
+            text-align: right;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        @media(min-width:768px) {
+            .flex>* {
+                flex: 1 1 calc(50% - 10px);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="app"></div>
+    </div>
+
+    <!-- Biblioteca QR Code -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <script>
+        // ================= DADOS INICIAIS =================
+        if (!localStorage.getItem("produtos")) localStorage.setItem("produtos", JSON.stringify([]));
+        if (!localStorage.getItem("vendas")) localStorage.setItem("vendas", JSON.stringify([]));
+        if (!localStorage.getItem("clientesFiado")) localStorage.setItem("clientesFiado", JSON.stringify([]));
+
+        let app = document.getElementById("app");
+        let carrinho = [];
+        let usuarioLogado = null;
+
+        // ================= LOGIN =================
+        function telaLogin() {
+            app.innerHTML = `
+    <div class="login-box">
+        <h1>Mercado Online</h1>
+        <input id="usuario" placeholder="Usuário" type="text"/>
+        <input id="senha" placeholder="Senha" type="password"/>
+        <button id="btnLogin">Entrar</button>
+    </div>`;
+            document.getElementById("btnLogin").onclick = () => {
+                const u = document.getElementById("usuario").value;
+                const s = document.getElementById("senha").value;
+                if (u === "admin" && s === "1234") usuarioLogado = "admin", telaAdmin();
+                else if (u === "caixa" && s === "1234") usuarioLogado = "caixa", telaCaixa();
+                else alert("Login inválido");
+            }
+        }
+
+        // ================= ADMIN =================
+        function telaAdmin() {
+            let produtos = JSON.parse(localStorage.getItem("produtos"));
+            app.innerHTML = `
+    <div class="admin-box">
+        <h2>Admin - Produtos</h2>
+        <input id="codigo" placeholder="Código do Produto"/>
+        <input id="nome" placeholder="Nome do Produto"/>
+        <input id="preco" placeholder="Preço" type="number"/>
+        <input id="estoque" placeholder="Estoque" type="number"/>
+        <button id="btnAddProduto">Adicionar Produto</button>
+        <button id="btnDashboard">Dashboard</button>
+        <button id="btnLogout">Logout</button>
+        <div class="produtos-box">
+            <h3>Produtos Cadastrados</h3>
+            <table>
+                <thead><tr><th>Código</th><th>Nome</th><th>Preço</th><th>Estoque</th></tr></thead>
+                <tbody id="listaProdutos"></tbody>
+            </table>
+        </div>
+    </div>`;
+            atualizarListaProdutos();
+
+            document.getElementById("btnAddProduto").onclick = () => {
+                let codigo = document.getElementById("codigo").value;
+                let nome = document.getElementById("nome").value;
+                let preco = parseFloat(document.getElementById("preco").value);
+                let estoque = parseInt(document.getElementById("estoque").value);
+                if (!codigo || !nome || isNaN(preco) || isNaN(estoque)) {
+                    alert("Preencha todos os campos");
+                    return;
+                }
+                if (produtos.find(p => p.codigo === codigo)) {
+                    alert("Código já cadastrado");
+                    return;
+                }
+                produtos.push({
+                    codigo,
+                    nome,
+                    preco,
+                    estoque
+                });
+                localStorage.setItem("produtos", JSON.stringify(produtos));
+                atualizarListaProdutos();
+                alert("Produto cadastrado");
+            }
+
+            document.getElementById("btnDashboard").onclick = dashboard;
+            document.getElementById("btnLogout").onclick = telaLogin;
+
+            function atualizarListaProdutos() {
+                let tbody = document.getElementById("listaProdutos");
+                tbody.innerHTML = "";
+                produtos.forEach(p => {
+                    tbody.innerHTML += `<tr>
+            <td>${p.codigo}</td><td>${p.nome}</td><td>${p.preco.toFixed(2)}</td><td>${p.estoque}</td>
+            </tr>`;
+                });
+            }
+        }
+
+        // ================= DASHBOARD =================
+        function dashboard() {
+            let vendas = JSON.parse(localStorage.getItem("vendas"));
+            let totalLucro = vendas.reduce((s, v) => s + v.total, 0);
+            let clientesFiado = JSON.parse(localStorage.getItem("clientesFiado"));
+
+            app.innerHTML = `
+    <div class="dashboard-box">
+        <h2>Dashboard</h2>
+        <div class="vendas-box">
+            <h3>Vendas do Dia</h3>
+            <table>
+                <thead><tr><th>Data</th><th>Total</th><th>Pagamento</th></tr></thead>
+                <tbody id="listaVendas"></tbody>
+            </table>
+            <div class="total">Lucro Total: R$${totalLucro.toFixed(2)}</div>
+        </div>
+        <div class="fiado-box">
+            <h3>Clientes Fiado</h3>
+            <table>
+                <thead><tr><th>Nome</th><th>Total Fiado</th><th>Limite</th></tr></thead>
+                <tbody id="listaFiado"></tbody>
+            </table>
+        </div>
+        <button onclick="usuarioLogado==='admin'?telaAdmin():telaCaixa()">Voltar</button>
+    </div>`;
+
+            let tbodyVendas = document.getElementById("listaVendas");
+            vendas.forEach(v => {
+                tbodyVendas.innerHTML += `<tr><td>${v.data}</td><td>R$${v.total.toFixed(2)}</td><td>${v.pagamento}</td></tr>`;
+            });
+
+            let tbodyFiado = document.getElementById("listaFiado");
+            clientesFiado.forEach(c => {
+                let totalFiado = c.compras.reduce((s, comp) => s + comp.total, 0);
+                tbodyFiado.innerHTML += `<tr><td>${c.nome}</td><td>R$${totalFiado.toFixed(2)}</td><td>R$${c.limite}</td></tr>`;
+            });
+        }
+
+        // ================= CAIXA =================
+        function telaCaixa() {
+            let produtos = JSON.parse(localStorage.getItem("produtos"));
+            let clientesFiado = JSON.parse(localStorage.getItem("clientesFiado"));
+            let vendas = JSON.parse(localStorage.getItem("vendas"));
+
+            app.innerHTML = `
+    <div class="caixa-box">
+        <h2>Caixa</h2>
+        <div class="flex">
+            <div>
+                <input id="buscarProduto" placeholder="Buscar por código ou nome"/>
+                <button id="btnAdicionar">Adicionar ao Carrinho</button>
+                <button id="btnScanner">Escanear Código</button>
+                <div class="carrinho-box">
+                    <h3>Carrinho</h3>
+                    <table>
+                        <thead><tr><th>Produto</th><th>Qtd</th><th>Subtotal</th></tr></thead>
+                        <tbody id="listaCarrinho"></tbody>
+                    </table>
+                    <div class="total" id="totalCarrinho">Total: R$0.00</div>
+                </div>
+            </div>
+            <div>
+                <h3>Pagamento</h3>
+                <select id="tipoPagamento">
+                    <option value="dinheiro">Dinheiro</option>
+                    <option value="cartao">Cartão</option>
+                    <option value="pix">Pix</option>
+                    <option value="fiado">Fiado</option>
+                </select>
+                <input id="nomeFiado" placeholder="Nome do Cliente (Fiado)" class="hidden"/>
+                <button id="btnFinalizar">Finalizar Venda</button>
+                <button id="btnFecharCaixa">Fechar Caixa</button>
+                <button id="btnLogoutCaixa">Logout</button>
+            </div>
+        </div>
+        <div id="reader" style="width:300px; margin-top:20px;"></div>
+    </div>`;
+
+            const listaCarrinho = document.getElementById("listaCarrinho");
+            const totalCarrinho = document.getElementById("totalCarrinho");
+            const nomeFiado = document.getElementById("nomeFiado");
+            const tipoPagamento = document.getElementById("tipoPagamento");
+
+            tipoPagamento.onchange = () => {
+                nomeFiado.style.display = tipoPagamento.value === "fiado" ? "block" : "none";
+            }
+
+            document.getElementById("btnAdicionar").onclick = () => {
+                let busca = document.getElementById("buscarProduto").value;
+                let prod = produtos.find(p => p.codigo === busca || p.nome.toLowerCase() === busca.toLowerCase());
+                if (!prod) {
+                    alert("Produto não encontrado");
+                    return;
+                }
+                let qtd = parseInt(prompt("Quantidade:", "1"));
+                if (isNaN(qtd) || qtd <= 0 || qtd > prod.estoque) {
+                    alert("Quantidade inválida");
+                    return;
+                }
+                prod.estoque -= qtd;
+                localStorage.setItem("produtos", JSON.stringify(produtos));
+                let subtotal = qtd * prod.preco;
+                carrinho.push({
+                    codigo: prod.codigo,
+                    nome: prod.nome,
+                    qtd,
+                    subtotal
+                });
+                atualizarCarrinho();
+            }
+
+            function atualizarCarrinho() {
+                listaCarrinho.innerHTML = "";
+                let total = 0;
+                carrinho.forEach(i => {
+                    listaCarrinho.innerHTML += `<tr><td>${i.nome}</td><td>${i.qtd}</td><td>R$${i.subtotal.toFixed(2)}</td></tr>`;
+                    total += i.subtotal;
+                });
+                totalCarrinho.innerText = `Total: R$${total.toFixed(2)}`;
+            }
+
+            document.getElementById("btnFinalizar").onclick = () => {
+                if (carrinho.length === 0) {
+                    alert("Carrinho vazio");
+                    return;
+                }
+                let pagamento = tipoPagamento.value;
+                let total = carrinho.reduce((s, i) => s + i.subtotal, 0);
+
+                if (pagamento === "fiado") {
+                    let nome = nomeFiado.value.trim();
+                    if (!nome) {
+                        alert("Digite o nome do cliente");
+                        return;
+                    }
+                    let cliente = clientesFiado.find(c => c.nome === nome);
+                    if (!cliente) cliente = {
+                        nome,
+                        nome,
+                        compras: [],
+                        limite: 500
+                    };
+                    let totalFiado = cliente.compras.reduce((s, c) => s + c.total, 0) + total;
+                    if (totalFiado > cliente.limite) {
+                        alert("Limite do fiado atingido!");
+                        return;
+                    }
+                    cliente.compras.push({
+                        itens: carrinho,
+                        total,
+                        data: new Date().toLocaleString()
+                    });
+                    clientesFiado = clientesFiado.filter(c => c.nome !== nome);
+                    clientesFiado.push(cliente);
+                    localStorage.setItem("clientesFiado", JSON.stringify(clientesFiado));
+                    // WhatsApp
+                    let msg = `Compras de ${nome}:\n`;
+                    cliente.compras.forEach(c => {
+                        msg += `Data: ${c.data}\n`;
+                        c.itens.forEach(i => msg += `${i.nome} x${i.qtd} - R$${i.subtotal.toFixed(2)}\n`);
+                        msg += `Total: R$${c.total.toFixed(2)}\n\n`;
+                    });
+                    window.open(`https://wa.me/SEUNUMERO?text=${encodeURIComponent(msg)}`);
+                }
+
+                vendas.push({
+                    itens: carrinho,
+                    total,
+                    pagamento,
+                    data: new Date().toLocaleString()
+                });
+                localStorage.setItem("vendas", JSON.stringify(vendas));
+                alert("Venda finalizada!");
+                carrinho = [];
+                atualizarCarrinho();
+            }
+
+            document.getElementById("btnFecharCaixa").onclick = () => {
+                let vendas = JSON.parse(localStorage.getItem("vendas"));
+                if (vendas.length === 0) {
+                    alert("Nenhuma venda");
+                    return;
+                }
+                let totalDia = vendas.reduce((s, v) => s + v.total, 0);
+                let msg = `Resumo do Caixa:\n\n`;
+                vendas.forEach(v => {
+                    msg += `Data: ${v.data}\n`;
+                    v.itens.forEach(i => msg += `${i.nome} x${i.qtd} - R$${i.subtotal.toFixed(2)}\n`);
+                    msg += `Total: R$${v.total.toFixed(2)}\n\n`;
+                });
+                msg += `Lucro Total: R$${totalDia.toFixed(2)}\n`;
+                window.open(`https://wa.me/SEUNUMERO?text=${encodeURIComponent(msg)}`);
+            }
+
+            document.getElementById("btnLogoutCaixa").onclick = telaLogin;
+
+            document.getElementById("btnScanner").onclick = () => {
+                const html5QrCode = new Html5Qrcode("reader");
+                html5QrCode.start({
+                        facingMode: "environment"
+                    }, {
+                        fps: 10,
+                        qrbox: 250
+                    },
+                    decodedText => {
+                        document.getElementById("buscarProduto").value = decodedText;
+                        html5QrCode.stop();
+                        alert(`Código lido: ${decodedText}`);
+                    }, errorMessage => {}
+                ).catch(err => console.log(err));
+            }
+        }
+
+        // ================= INICIO =================
+        telaLogin();
+    </script>
+</body>
+
+</html>
